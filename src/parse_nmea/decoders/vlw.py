@@ -9,8 +9,12 @@ def decode(parts: list[str]) -> NmeaDict:
     data = {
         "water_total_nm": parse_float(parts[1]),
         "water_since_reset_nm": parse_float(parts[3]),
-        "ground_total_nm": parse_float(parts[5]),
-        "ground_since_reset_nm": parse_float(parts[7]),
     }
+    if len(parts) > 7:
+        data["ground_total_nm"] = parse_float(parts[5])
+        data["ground_since_reset_nm"] = parse_float(parts[7])
+    else:
+        data["ground_total_nm"] = None
+        data["ground_since_reset_nm"] = None
 
     return data
