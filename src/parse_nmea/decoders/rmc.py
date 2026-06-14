@@ -19,10 +19,10 @@ def decode(parts: list[str]) -> NmeaDict:
         "longitude": parse_longitude(parts[5], parts[6]),
         "sog_knots": parse_float(parts[7]),
         "cog_true": parse_float(parts[8]),
-        "magnetic_variation": parts[10],
+        "magnetic_variation": parse_float(parts[10]),
     }
 
-    if parts[11].upper() == 'W':
+    if data["magnetic_variation"] is not None and parts[11].upper() == 'W':
         data["magnetic_variation"] *= -1
 
     return data
