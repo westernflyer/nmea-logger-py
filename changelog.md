@@ -1,3 +1,6 @@
+# 1.7.1
+Fixed potential errors in `VLW` and `RMC` parsers.
+
 # 1.7.0
 Added support for the DuckDB "Quack" protocol.
 
