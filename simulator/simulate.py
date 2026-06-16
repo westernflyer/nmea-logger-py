@@ -135,7 +135,7 @@ def main():
             
             # Generate and publish data for each sentence type in PUBLISH_INTERVALS
             for address_field in publish_intervals:
-                sentence = generate_sentence(address_field[2:5])
+                sentence = generate_sentence(address_field)
                 if sentence:
                     try:
                         parsed_nmea = parse_nmea.parse(sentence)
@@ -154,8 +154,9 @@ def main():
         client.disconnect()
 
 
-def generate_sentence(sentence_type: str) -> str | None:
+def generate_sentence(address_field: str) -> str | None:
     """Generate a synthetic NMEA 0183 sentence."""
+    sentence_type = address_field[2:5]
     now = time.gmtime()
     hhmmss = time.strftime("%H%M%S", now)
     ddmmyy = time.strftime("%d%m%y", now)
@@ -173,51 +174,51 @@ def generate_sentence(sentence_type: str) -> str | None:
 
     if sentence_type == "GGA":
         # $GPGGA,hhmmss.ss,llll.ll,a,yyyyy.yy,a,x,xx,x.x,x.x,M,x.x,M,x.x,xxxx*hh
-        payload = f"GPGGA,{hhmmss}.00,{lat_deg:02d}{lat_min:06.3f},{lat_dir},{lon_deg:03d}{lon_min:06.3f},{lon_dir},1,08,0.9,10.0,M,-30.0,M,,"
+        payload = f"{address_field},{hhmmss}.00,{lat_deg:02d}{lat_min:06.3f},{lat_dir},{lon_deg:03d}{lon_min:06.3f},{lon_dir},1,08,0.9,10.0,M,-30.0,M,,"
     elif sentence_type == "RMC":
         # $GPRMC,hhmmss.ss,A,llll.ll,a,yyyyy.yy,a,x.x,x.x,ddmmyy,x.x,a*hh
-        payload = f"GPRMC,{hhmmss}.00,A,{lat_deg:02d}{lat_min:06.3f},{lat_dir},{lon_deg:03d}{lon_min:06.3f},{lon_dir},{state.sog:.1f},{state.cog:.1f},{ddmmyy},15.0,E"
+        payload = f"{address_field},{hhmmss}.00,A,{lat_deg:02d}{lat_min:06.3f},{lat_dir},{lon_deg:03d}{lon_min:06.3f},{lon_dir},{state.sog:.1f},{state.cog:.1f},{ddmmyy},15.0,E"
     elif sentence_type == "DPT":
         # $IIDPT,x.x,x.x,x.x*hh
         depth = state.depth
         offset = 1.5
-        payload = f"IIDPT,{depth:.1f},{offset:.1f},100.0"
+        payload = f"{address_field},{depth:.1f},{offset:.1f},100.0"
     elif sentence_type == "MWV":
         # $IIMWV,x.x,a,x.x,a,A*hh
         # Relative wind angle and speed
         angle = random.uniform(0, 360)
         speed = random.uniform(0, 30)
-        payload = f"IIMWV,{angle:.1f},R,{speed:.1f},N,A"
+        payload = f"{address_field},{angle:.1f},R,{speed:.1f},N,A"
     elif sentence_type == "HDT":
         # $IIHDT,x.x,T*hh
-        payload = f"IIHDT,{state.heading:.1f},T"
+        payload = f"{address_field},{state.heading:.1f},T"
     elif sentence_type == "GLL":
         # $GPGLL,llll.ll,a,yyyyy.yy,a,hhmmss.ss,A,a*hh
-        payload = f"GPGLL,{lat_deg:02d}{lat_min:06.3f},{lat_dir},{lon_deg:03d}{lon_min:06.3f},{lon_dir},{hhmmss}.00,A,A"
+        payload = f"{address_field},{lat_deg:02d}{lat_min:06.3f},{lat_dir},{lon_deg:03d}{lon_min:06.3f},{lon_dir},{hhmmss}.00,A,A"
     elif sentence_type == "VTG":
         # $GPVTG,x.x,T,x.x,M,x.x,N,x.x,K,a*hh
-        payload = f"GPVTG,{state.cog:.1f},T,{state.cog - 15.0:.1f},M,{state.sog:.1f},N,{state.sog * 1.852:.1f},K,A"
+        payload = f"{address_field},{state.cog:.1f},T,{state.cog - 15.0:.1f},M,{state.sog:.1f},N,{state.sog * 1.852:.1f},K,A"
     elif sentence_type == "ROT":
         # $IIROT,x.x,A*hh
         rot = random.uniform(-5, 5)
-        payload = f"IIROT,{rot:.1f},A"
+        payload = f"{address_field},{rot:.1f},A"
     elif sentence_type == "RSA":
         # $IIRSA,x.x,A,x.x,A*hh
         rudder = random.uniform(-30, 30)
-        payload = f"IIRSA,{rudder:.1f},A,{rudder:.1f},A"
+        payload = f"{address_field},{rudder:.1f},A,{rudder:.1f},A"
     elif sentence_type == "MDA":
         # $IIMDA,x.x,I,x.x,B,x.x,C,x.x,C,x.x,x.x,x.x,C,x.x,T,x.x,M,x.x,N,x.x,M*hh
         temp = 20.0 + random.uniform(-5, 5)
         press = 1013.0 + random.uniform(-10, 10)
-        payload = f"IIMDA,30.0,I,{press / 1000:.3f},B,{temp:.1f},C,,,,,15.0,C,,,,,,,"
+        payload = f"{address_field},30.0,I,{press / 1000:.3f},B,{temp:.1f},C,,,,,15.0,C,,,,,,,"
     elif sentence_type == "VWR":
         # $IIVWR,x.x,a,x.x,N,x.x,M,x.x,K*hh
         angle = random.uniform(0, 180)
         speed = random.uniform(0, 30)
-        payload = f"IIVWR,{angle:.1f},L,{speed:.1f},N,{speed * 0.514:.1f},M,{speed * 1.852:.1f},K"
+        payload = f"{address_field},{angle:.1f},L,{speed:.1f},N,{speed * 0.514:.1f},M,{speed * 1.852:.1f},K"
     elif sentence_type == "VLW":
         # $IIVLW,x.x,N,x.x,N,x.x,N,x.x,N*hh
-        payload = f"IIVLW,123.4,N,12.3,N,110.0,N,11.0,N"
+        payload = f"{address_field},123.4,N,12.3,N,110.0,N,11.0,N"
     else:
         return None
 
