@@ -56,7 +56,7 @@ async def main() -> None:
     global config, publish_intervals
 
     parser = argparse.ArgumentParser(
-        description="Read NMEA sentences from multiple sockets, parse, then publish to MQTT.")
+        description="Read NMEA sentences from multiple sockets, parse, then save to DuckDB and publish to MQTT.")
     parser.add_argument("--config", default="config.toml",
                         help="Path to the TOML configuration file (default: config.toml)")
     args = parser.parse_args()
