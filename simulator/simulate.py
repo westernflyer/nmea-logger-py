@@ -28,13 +28,14 @@ import parse_nmea
 # Global configuration dictionary
 config = {}
 
+
 # Simulator state
 class SimulatorState:
     def __init__(self):
         # Starting position (lat, lon)
         self.lat = 45.5  # 45 degrees 30.0 minutes
         self.lon = -122.666  # 122 degrees 40.0 minutes
-        
+
         # Current Speed Over Ground (knots)
         self.sog = 6.0
         # Current Course Over Ground (degrees true)
@@ -43,33 +44,36 @@ class SimulatorState:
         self.heading = 45.0
 
         self.depth = 15.0
-        
+
+        self.tws_knots = 10.0
+        self.twa = 180.0
+
         # Last update time
         self.last_update = time.time()
-        
+
     def update(self):
         now = time.time()
         dt = now - self.last_update
         self.last_update = now
-        
+
         # Add some random fluctuations to SOG and COG
         self.sog += random.uniform(-0.1, 0.1)
-        self.sog = max(0.0, min(self.sog, 20)) # Keep speed within 0-20 knots
-        
+        self.sog = max(0.0, min(self.sog, 20))  # Keep speed within 0-20 knots
+
         self.cog += random.uniform(-1.0, 1.0)
         self.cog %= 360
-        
+
         # Heading follows COG with some deviation
         self.heading = (self.cog + random.uniform(-2.0, 2.0)) % 360
-        
+
         # Update position based on SOG and COG
         # 1 knot = 1 nautical mile per hour
         # 1 nautical mile = 1 minute of latitude
         # 1 minute of latitude = 1/60 degree
-        
+
         # Distance traveled in nautical miles
         distance_nm = (self.sog * dt) / 3600.0
-        
+
         # Heading and course are in degrees true.
         # NMEA 0183 convention: 0 is North, 90 is East, 180 is South, 270 is West.
         # Math convention: 0 is East, 90 is North.
@@ -78,10 +82,10 @@ class SimulatorState:
 
         # Change in latitude (nm * sin(angle_math))
         d_lat_deg = (distance_nm * math.sin(angle_math)) / 60.0
-        
+
         # Change in longitude (nm * cos(angle_math) / cos(lat))
         d_lon_deg = (distance_nm * math.cos(angle_math)) / (60.0 * math.cos(math.radians(self.lat)))
-        
+
         self.lat += d_lat_deg
         self.lon += d_lon_deg
 
@@ -89,12 +93,22 @@ class SimulatorState:
         if self.depth < 0:
             self.depth = 15.0
 
+        # Add some random fluctuations to the wind
+        self.tws_knots += random.uniform(-2.0, 2.0)
+        self.tws_knots = max(0.0, min(self.tws_knots, 30))  # Keep speed within 0-30 knots
+
+        self.twa += random.uniform(-5.0, 5.0)
+        self.twa %= 360
+
+
 state = SimulatorState()
+
 
 def main():
     global config
     parser = argparse.ArgumentParser(description="Simulate NMEA sentences and publish them to MQTT.")
-    parser.add_argument("--config", default="config.toml", help="Path to the TOML configuration file (default: config.toml)")
+    parser.add_argument("--config", default="config.toml",
+                        help="Path to the TOML configuration file (default: config.toml)")
     args = parser.parse_args()
 
     try:
@@ -132,7 +146,7 @@ def main():
         while True:
             # Update the simulator state
             state.update()
-            
+
             # Generate and publish data for each sentence type in PUBLISH_INTERVALS
             for address_field in publish_intervals:
                 sentence = generate_sentence(address_field)
@@ -156,6 +170,8 @@ def main():
 
 def generate_sentence(address_field: str) -> str | None:
     """Generate a synthetic NMEA 0183 sentence."""
+    global state
+
     sentence_type = address_field[2:5]
     now = time.gmtime()
     hhmmss = time.strftime("%H%M%S", now)
@@ -166,7 +182,7 @@ def generate_sentence(address_field: str) -> str | None:
     lat_deg = int(lat_abs)
     lat_min = (lat_abs - lat_deg) * 60
     lat_dir = 'N' if state.lat >= 0 else 'S'
-    
+
     lon_abs = abs(state.lon)
     lon_deg = int(lon_abs)
     lon_min = (lon_abs - lon_deg) * 60
@@ -188,7 +204,7 @@ def generate_sentence(address_field: str) -> str | None:
         # Relative wind angle and speed
         angle = random.uniform(0, 360)
         speed = random.uniform(0, 30)
-        payload = f"{address_field},{angle:.1f},R,{speed:.1f},N,A"
+        payload = f"{address_field},{state.twa:.1f},R,{state.tws_knots:.1f},N,A"
     elif sentence_type == "HDT":
         # $IIHDT,x.x,T*hh
         payload = f"{address_field},{state.heading:.1f},T"
