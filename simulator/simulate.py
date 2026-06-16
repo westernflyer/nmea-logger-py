@@ -108,15 +108,16 @@ def main():
         sys.exit(1)
 
     print("Starting NMEA simulator...")
-    mqtt_broker = config.get("MQTT_BROKER", "localhost")
-    mqtt_port = config.get("MQTT_PORT", 1883)
-    mqtt_topic_prefix = config.get("MQTT_TOPIC_PREFIX", "nmea")
+    mqtt_config = config.get("MQTT_OPTIONS", {})
+    mqtt_broker = mqtt_config.get("MQTT_BROKER", "localhost")
+    mqtt_port = mqtt_config.get("MQTT_PORT", 1883)
+    mqtt_topic_prefix = mqtt_config.get("MQTT_TOPIC_PREFIX", "nmea")
     print(f"MQTT Broker: {mqtt_broker}:{mqtt_port}")
     print(f"Topic prefix: {mqtt_topic_prefix}")
 
     client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2)
-    mqtt_username = config.get("MQTT_USERNAME")
-    mqtt_password = config.get("MQTT_PASSWORD")
+    mqtt_username = mqtt_config.get("MQTT_USERNAME")
+    mqtt_password = mqtt_config.get("MQTT_PASSWORD")
     if mqtt_username and mqtt_password:
         client.username_pw_set(mqtt_username, mqtt_password)
 
@@ -127,20 +128,20 @@ def main():
     client.loop_start()
 
     try:
-        publish_intervals = config.get("PUBLISH_INTERVALS", {})
+        publish_intervals = config.get("MQTT_PUBLISH_INTERVALS", {})
         while True:
             # Update the simulator state
             state.update()
             
             # Generate and publish data for each sentence type in PUBLISH_INTERVALS
-            for sentence_type in publish_intervals:
-                sentence = generate_sentence(sentence_type[2:])
+            for address_field in publish_intervals:
+                sentence = generate_sentence(address_field[2:5])
                 if sentence:
                     try:
                         parsed_nmea = parse_nmea.parse(sentence)
                         publish_nmea(client, parsed_nmea)
                     except Exception as e:
-                        print(f"Error parsing/publishing {sentence_type}: {e}")
+                        print(f"Error parsing/publishing {address_field}: {e}")
 
             # Wait for a bit before the next round. 
             # In a real simulator we might want different frequencies, 
@@ -208,7 +209,7 @@ def generate_sentence(sentence_type: str) -> str | None:
         # $IIMDA,x.x,I,x.x,B,x.x,C,x.x,C,x.x,x.x,x.x,C,x.x,T,x.x,M,x.x,N,x.x,M*hh
         temp = 20.0 + random.uniform(-5, 5)
         press = 1013.0 + random.uniform(-10, 10)
-        payload = f"IIMDA,30.0,I,{press / 1000:.3f},B,{temp:.1f},C,,,,,15.0,C,,,,,,"
+        payload = f"IIMDA,30.0,I,{press / 1000:.3f},B,{temp:.1f},C,,,,,15.0,C,,,,,,,"
     elif sentence_type == "VWR":
         # $IIVWR,x.x,a,x.x,N,x.x,M,x.x,K*hh
         angle = random.uniform(0, 180)
@@ -224,12 +225,13 @@ def generate_sentence(sentence_type: str) -> str | None:
     return f"${payload}*{cs:02X}"
 
 
-def publish_nmea(client: mqtt.Client, parsed_nmea: parse_nmea.NmeaDict):
+def publish_nmea(client: mqtt.Client, parsed_nmea: tuple[str, parse_nmea.NmeaDict]):
     """Publish parsed NMEA data to MQTT."""
+    global config
     mmsi = config.get("MMSI", "unknown")
-    topic = f"{config.get('MQTT_TOPIC_PREFIX', 'nmea')}/{mmsi}/{parsed_nmea['sentence_type']}"
-    client.publish(topic, json.dumps(parsed_nmea), qos=0)
-    print(f"Published {parsed_nmea['sentence_type']} to {topic}")
+    topic = f"{config['MQTT_OPTIONS'].get('MQTT_TOPIC_PREFIX', 'nmea')}/{mmsi}/{parsed_nmea[0]}"
+    client.publish(topic, json.dumps(parsed_nmea[1]), qos=0)
+    print(f"Published {parsed_nmea[0]} to {topic}")
 
 
 if __name__ == "__main__":
