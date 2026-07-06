@@ -72,12 +72,14 @@ async def main() -> None:
     if os.getenv("NMEA_LOGGER_DEBUG") is not None:
         config["DEBUG"] = int(os.getenv("NMEA_LOGGER_DEBUG", 0))
 
-    # Set up logging using the system logger
+    # Set up logging depending on the OS
     if sys.platform == "darwin":
+        # For macOS, log to a rotating file
         from logging.handlers import TimedRotatingFileHandler
         log_file = "/var/tmp/nmea-logger.log"
         handler = TimedRotatingFileHandler(log_file, when='midnight', backupCount=7)
     else:
+        # For everything else, log to syslog
         from logging.handlers import SysLogHandler
         handler = SysLogHandler(address='/dev/log')
     log.setLevel(logging.DEBUG if config.get("DEBUG") else logging.INFO)
@@ -91,13 +93,13 @@ async def main() -> None:
     # Set up the dictionary of last published timestamps.
     publish_intervals = config.get("MQTT_PUBLISH_INTERVALS", {})
 
-    # Shared queues for parsed NMEA sentences. Moving them here makes them
+    # Shared queues for parsed NMEA sentences. Putting them here makes them
     # persist across failures in any individual service.
     mqtt_queue = asyncio.Queue(maxsize=1000)
     duckdb_queue = asyncio.Queue(maxsize=1000)
     subscribers = [mqtt_queue, duckdb_queue]
 
-    # Start the self-healing services
+    # Start the consuming services
     mqtt_service_task = asyncio.create_task(mqtt_services.mqtt_service(mqtt_queue, config))
     duckdb_service_task = asyncio.create_task(duckdb_services.duckdb_service(duckdb_queue, config))
     service_tasks = [mqtt_service_task, duckdb_service_task]
@@ -151,7 +153,7 @@ async def main() -> None:
 
 
 async def nmea_reader_task(host, port, subscribers):
-    """Task for reading from a single NMEA socket and putting into the queue.
+    """Task for reading from a single NMEA socket and putting contents into the queue.
     Args:
         host (str): The hostname or IP address of the NMEA socket.
         port (int): The port number of the NMEA socket.
@@ -212,7 +214,7 @@ async def gen_nmea(host: str, port: int) -> AsyncGenerator[str, None]:
         writer.close()
         try:
             await writer.wait_closed()
-        except Exception:
+        except (asyncio.CancelledError, OSError):
             pass
 
 
