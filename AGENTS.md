@@ -5,7 +5,7 @@ This document provides essential information for AI agents (like Junie) working 
 ## Project Overview
 
 `nmea-logger-py` is a Python-based utility designed to read NMEA 0183 sentences from one or more TCP sockets, parse
-them, publish the results to an MQTT broker as JSON, and store them in a DuckDB database.
+them, publish the results to an MQTT broker as JSON, and store them in a SQLite database.
 
 ## Architecture
 
@@ -14,8 +14,8 @@ The project uses `asyncio` for concurrent operations. The main loop (`src/main.p
 - **NMEA Readers**: Connect to TCP sockets and yield NMEA sentences.
 - **Parser**: Decodes NMEA sentences into structured data.
 - **MQTT Service**: Publishes parsed data to an MQTT broker based on configured intervals.
-- **DuckDB Service**: Batches parsed data and writes it to a DuckDB database.
-- **Shared Queues**: `mqtt_queue` and `duckdb_queue` are used to pass data between the readers and the services.
+- **SQLite Service**: Batches parsed data and writes it to a SQLite database.
+- **Shared Queues**: `mqtt_queue` and `sqlite_queue` are used to pass data between the readers and the services.
 
 ## Key Files and Directories
 
@@ -23,7 +23,7 @@ The project uses `asyncio` for concurrent operations. The main loop (`src/main.p
 - `src/parse_nmea/`: Core parsing logic.
   - `decoders/`: Individual NMEA sentence decoders (e.g., `gll.py`, `mwv.py`).
 - `src/mqtt_services.py`: MQTT publishing logic.
-- `src/duckdb_services.py`: DuckDB storage and Quack protocol implementation.
+- `src/sqlite_services.py`: SQLite storage implementation.
 - `src/service_utils.py`: Shared utilities for services (e.g., error handling).
 - `config.toml`: User configuration (use `config_sample.toml` as a template).
 - `simulator/`: A tool for generating synthetic NMEA data for testing.
@@ -36,14 +36,20 @@ The project uses `asyncio` for concurrent operations. The main loop (`src/main.p
 2.  Implement the `decode(parts: list[str])` function in that file, following the pattern in existing decoders.
 3.  The parser in `src/parse_nmea/__init__.py` will automatically discover the new decoder using dynamic import based on
     the sentence type.
-4.  If the sentence should be stored in DuckDB:
-    - Add a new entry to `TABLE_SCHEMAS` in `src/duckdb_services.py`.
-    - Update `map_fields()` in `src/duckdb_services.py` to map the parsed data to the table columns.
+4.  If the sentence should be stored in SQLite:
+    - Add a new entry to `TABLE_SCHEMAS` in `src/sqlite_services.py`.
+    - Update `map_fields()` in `src/sqlite_services.py` to map the parsed data to the table columns.
 5.  Add tests for the new decoder in `tests/test_parse_nmea.py`.
 
-### Modifying DuckDB Schema
+### SQLITE Schema
 
--   Database initialization and table creation happen in `src/duckdb_services.py` via `TABLE_SCHEMAS`.
+The following are common fields for all tables:
+-   Timestamps are stored in field `timestamp` in milliseconds since epoch.
+-   The NMEA talker is stored in field `talker`.
+ 
+### Modifying SQLite Schema
+
+-   Database initialization and table creation happen in `src/sqlite_services.py` via `TABLE_SCHEMAS`.
 -   If you add a new table, ensure it's handled in the `map_fields()` function.
 
 ### Troubleshooting Services

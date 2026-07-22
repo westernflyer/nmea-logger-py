@@ -1,7 +1,7 @@
 # NMEA 0183 Logger and MQTT Publisher
 
 Read NMEA 0183 sentences from one or more sockets, parse them, then publish to
-MQTT as JSON, and store to a DuckDB database.
+MQTT as JSON, and store to a SQLite database.
 
 ## Socket input
 
@@ -41,84 +41,40 @@ There is a hack in the code for the FT602. If an address field of `WIMWV` is
 received from port 60002, it will be changed to `FTMWV` to disambiguate it from
 sentences being sent by the Airmar 200WX.
 
-## DuckDB database
+## SQLite database
 
-Parsed NMEA data is also written to a DuckDB database.
+Parsed NMEA data is also written to a SQLite database.
 
 Example configuration:
 
 ```toml
-[DUCKDB]
+[SQLITE]
 DATABASE_PATH = "nmea_database.db"
-BATCH_SIZE = 1200
-BATCH_INTERVAL = 120
+BATCH_SIZE = 100
+BATCH_INTERVAL = 10
 ```
 
 The data is grouped by sentence type and written using parameterized batch
 insertions. The database contains eight distinct tables, one for each supported
 NMEA sentence type (`DPT`, `GLL`, `HDT`, `MDA`, `MWV`, `ROT`, `RSA`, `VTG`).
-Naive UTC timestamps are stored under the `timestamp` column.
+Naive UTC timestamps are stored under the `timestamp` column in milliseconds since
+the epoch.
 
 Here is the schema for the `GLL` table. Other tables are similar.
 
 ```sql
 CREATE TABLE IF NOT EXISTS GLL
 (
-    timestamp TIMESTAMP_MS,
-    talker    VARCHAR,
-    latitude  DOUBLE,
-    longitude DOUBLE
+  timestamp INTEGER NOT NULL,
+  talker    TEXT NOT NULL,
+  latitude  REAL,
+  longitude REAL,
+  PRIMARY KEY (timestamp, talker)
 );
 ```
 
-### DuckDB Quack protocol
-
-To allow multiple processes to access the DuckDB database concurrently, you can
-enable the [Quack protocol](https://duckdb.org/docs/current/quack/overview).
-This starts a Quack server within the `nmea-logger` process, which maintains
-primary ownership of the database file while allowing remote connections.
-
-##### Notice
-The Quack protocol is still in beta and has a few bugs. It also requires DuckDB version 1.5.3 or later. Unfortunately,
-because of the necessity of "attaching" a client to the Quack host, it does not lend itself well to monitoring
-by Grafana and other monitoring tools.
-
-#### Configuration
-
-To enable Quack, set the appropriate options in `config.toml`:
-
-```toml
-[DUCKDB.QUACK]
-ENABLE = true
-ADDRESS = "localhost:9494"
-TOKEN = "secret_token"
-```
-
-You can then connect to the database from another process (e.g., using the DuckDB CLI):
-
-```bash
-duckdb -c "ATTACH 'quack:localhost:9494' AS nmea (TOKEN secret_token); SELECT * FROM nmea.GLL LIMIT 10;"```
-```
-
-To allow connections from hosts other than the local machine, follow this configuration:
-
-```toml
-[DUCKDB.QUACK]
-ENABLE = true
-ADDRESS = "192.168.0.16:9494"
-ALLOW_OTHER_HOSTNAME = true
-TOKEN = "secret_token"
-```
-
-In this example, `192.168.0.16` is the IP address of the host. Then from the client:
-
-```bash
-duckdb -c "ATTACH 'quack:192.168.0.16:9494' AS nmea (TOKEN secret_token); SELECT * FROM nmea.GLL LIMIT 10;"```
-````
-
 ## Requirements
 
-- DuckDB (version 1.5.3 or later required for Quack protocol).
 - An MQTT broker.
 - Python v3.12 or greater. Earlier versions cannot be used due to how
   parameter types have been specified, and how `asyncio` raises `Timeout` 

@@ -1,9 +1,8 @@
 import asyncio
-
-import duckdb
+import sqlite3
 import pytest
 
-import duckdb_services
+import sqlite_services
 import main
 
 
@@ -12,7 +11,7 @@ async def test_schema_creation(tmp_path):
     db_path = str(tmp_path / "test_nmea.db")
     main.config = {
         "MMSI": "368323170",
-        "DUCKDB": {
+        "SQLITE": {
             "DATABASE_PATH": db_path,
             "BATCH_SIZE": 1,
             "BATCH_INTERVAL": 10
@@ -22,8 +21,8 @@ async def test_schema_creation(tmp_path):
     queue = asyncio.Queue()
 
     # Start publisher task
-    conn = duckdb.connect(db_path)
-    task = asyncio.create_task(duckdb_services.duckdb_publisher_task(conn, queue, main.config))
+    conn = sqlite3.connect(db_path, check_same_thread=False)
+    task = asyncio.create_task(sqlite_services.sqlite_publisher_task(conn, queue, main.config))
 
     # Allow some time for table creation/initialization
     await asyncio.sleep(0.2)
@@ -37,14 +36,16 @@ async def test_schema_creation(tmp_path):
     conn.close()
 
     # Verify tables in the database file
-    conn = duckdb.connect(db_path)
-    tables = [row[0] for row in conn.execute("PRAGMA show_tables").fetchall()]
+    conn = sqlite3.connect(db_path, check_same_thread=False)
+    cursor = conn.execute("SELECT name FROM sqlite_master WHERE type='table'")
+    tables = [row[0] for row in cursor.fetchall()]
     expected_tables = ["DPT", "GLL", "HDT", "MDA", "MWV", "ROT", "RSA", "VTG"]
     for t in expected_tables:
         assert t in tables
 
     # Verify columns in GLL
-    columns = conn.execute("PRAGMA table_info('GLL')").fetchall()
+    cursor = conn.execute("PRAGMA table_info('GLL')")
+    columns = cursor.fetchall()
     # columns format: (cid, name, type, notnull, dflt_value, pk)
     col_names = [col[1] for col in columns]
     assert col_names == ["timestamp", "talker", "latitude", "longitude"]
@@ -57,7 +58,7 @@ async def test_size_based_flushing(tmp_path):
     db_path = str(tmp_path / "test_size.db")
     main.config = {
         "MMSI": "368323170",
-        "DUCKDB": {
+        "SQLITE": {
             "DATABASE_PATH": db_path,
             "BATCH_SIZE": 3,
             "BATCH_INTERVAL": 10
@@ -65,8 +66,8 @@ async def test_size_based_flushing(tmp_path):
     }
 
     queue = asyncio.Queue()
-    conn = duckdb.connect(db_path)
-    task = asyncio.create_task(duckdb_services.duckdb_publisher_task(conn, queue, main.config))
+    conn = sqlite3.connect(db_path, check_same_thread=False)
+    task = asyncio.create_task(sqlite_services.sqlite_publisher_task(conn, queue, main.config))
 
     # Feed 3 items
     data = [
@@ -91,8 +92,9 @@ async def test_size_based_flushing(tmp_path):
     conn.close()
 
     # Verify items are in the GLL table
-    conn = duckdb.connect(db_path)
-    rows = conn.execute("SELECT * FROM GLL").fetchall()
+    conn = sqlite3.connect(db_path, check_same_thread=False)
+    cursor = conn.execute("SELECT * FROM GLL")
+    rows = cursor.fetchall()
     assert len(rows) == 3
     assert rows[0][1] == "GP"
     assert rows[0][2] == 44.623
@@ -105,7 +107,7 @@ async def test_interval_based_flushing(tmp_path):
     db_path = str(tmp_path / "test_interval.db")
     main.config = {
         "MMSI": "368323170",
-        "DUCKDB": {
+        "SQLITE": {
             "DATABASE_PATH": db_path,
             "BATCH_SIZE": 10,
             "BATCH_INTERVAL": 0.5
@@ -113,8 +115,8 @@ async def test_interval_based_flushing(tmp_path):
     }
 
     queue = asyncio.Queue()
-    conn = duckdb.connect(db_path)
-    task = asyncio.create_task(duckdb_services.duckdb_publisher_task(conn, queue, main.config))
+    conn = sqlite3.connect(db_path, check_same_thread=False)
+    task = asyncio.create_task(sqlite_services.sqlite_publisher_task(conn, queue, main.config))
 
     # Feed 2 items
     data = [
@@ -137,8 +139,9 @@ async def test_interval_based_flushing(tmp_path):
         pass
     conn.close()
 
-    conn = duckdb.connect(db_path)
-    rows = conn.execute("SELECT * FROM GLL").fetchall()
+    conn = sqlite3.connect(db_path, check_same_thread=False)
+    cursor = conn.execute("SELECT * FROM GLL")
+    rows = cursor.fetchall()
     assert len(rows) == 2
     conn.close()
 
@@ -148,7 +151,7 @@ async def test_sentence_field_mapping(tmp_path):
     db_path = str(tmp_path / "test_mapping.db")
     main.config = {
         "MMSI": "368323170",
-        "DUCKDB": {
+        "SQLITE": {
             "DATABASE_PATH": db_path,
             "BATCH_SIZE": 1,
             "BATCH_INTERVAL": 10
@@ -156,8 +159,8 @@ async def test_sentence_field_mapping(tmp_path):
     }
 
     queue = asyncio.Queue()
-    conn = duckdb.connect(db_path)
-    task = asyncio.create_task(duckdb_services.duckdb_publisher_task(conn, queue, main.config))
+    conn = sqlite3.connect(db_path, check_same_thread=False)
+    task = asyncio.create_task(sqlite_services.sqlite_publisher_task(conn, queue, main.config))
 
     # Test 1: MWV sentence
     # Apparent Wind Speed & Angle
@@ -198,17 +201,19 @@ async def test_sentence_field_mapping(tmp_path):
         pass
     conn.close()
 
-    conn = duckdb.connect(db_path)
+    conn = sqlite3.connect(db_path, check_same_thread=False)
 
     # Check MWV
-    mwv_rows = conn.execute("SELECT * FROM MWV").fetchall()
+    cursor = conn.execute("SELECT * FROM MWV")
+    mwv_rows = cursor.fetchall()
     assert len(mwv_rows) == 1
     assert mwv_rows[0][1] == "WI"
     assert mwv_rows[0][2] == 240.5
     assert mwv_rows[0][3] == 12.3
 
     # Check MDA
-    mda_rows = conn.execute("SELECT * FROM MDA").fetchall()
+    cursor = conn.execute("SELECT * FROM MDA")
+    mda_rows = cursor.fetchall()
     assert len(mda_rows) == 1
     assert mda_rows[0][1] == "II"
     assert mda_rows[0][2] == 1013.25
@@ -221,7 +226,8 @@ async def test_sentence_field_mapping(tmp_path):
     assert mda_rows[0][9] == 15.5
 
     # Check VTG
-    vtg_rows = conn.execute("SELECT * FROM VTG").fetchall()
+    cursor = conn.execute("SELECT * FROM VTG")
+    vtg_rows = cursor.fetchall()
     assert len(vtg_rows) == 1
     assert vtg_rows[0][1] == "GP"
     assert vtg_rows[0][2] == 230.1
@@ -232,24 +238,24 @@ async def test_sentence_field_mapping(tmp_path):
 
 
 @pytest.mark.asyncio
-async def test_duckdb_drain_on_cancel(tmp_path):
+async def test_sqlite_drain_on_cancel(tmp_path):
     db_path = str(tmp_path / "test_drain.db")
     config = {
-        "DUCKDB": {
+        "SQLITE": {
             "DATABASE_PATH": db_path,
             "BATCH_SIZE": 100,
             "BATCH_INTERVAL": 100
         }
     }
     queue = asyncio.Queue()
-    conn = duckdb.connect(db_path)
+    conn = sqlite3.connect(db_path, check_same_thread=False)
 
     # Put some items in the queue
     for i in range(10):
         await queue.put(("GPGLL", {"latitude": 44.0 + i / 100, "longitude": -124.0, "timestamp": 1700000000000 + i}))
 
     # Start the task
-    task = asyncio.create_task(duckdb_services.duckdb_publisher_task(conn, queue, config))
+    task = asyncio.create_task(sqlite_services.sqlite_publisher_task(conn, queue, config))
 
     # Wait a bit to make sure it started and is waiting for more items (since BATCH_SIZE=100)
     await asyncio.sleep(0.1)
@@ -263,7 +269,8 @@ async def test_duckdb_drain_on_cancel(tmp_path):
         pass
 
     # Verify that the 10 items were written
-    rows = conn.execute("SELECT count(*) FROM GLL").fetchone()[0]
+    cursor = conn.execute("SELECT count(*) FROM GLL")
+    rows = cursor.fetchone()[0]
     assert rows == 10
 
     # Also verify queue.join() would have worked

@@ -49,36 +49,19 @@ WIMWV = 10000    # Relative wind speed and angle - Airmar
 FTMWV = 10000    # Relative wind speed and angle - FT602
 
 # -----------------------------------------------------------------------------
-# DuckDB configuration.
+# SQLite configuration.
 # -----------------------------------------------------------------------------
 
-[DUCKDB]
+[SQLITE]
 
-# Path to the DuckDB database (env: DUCKDB_DATABASE_PATH)
-# Default: "nmea_database.db"
-# DATABASE_PATH = "nmea_database.db"
+# Path to the SQLite database (env: SQLITE_DATABASE_PATH)
+# Default: "nmea_database.sdb"
+# DATABASE_PATH = "nmea_database.sdb"
 
 # Batch sizes for writes to the database
-# Default: 1200
-# BATCH_SIZE = 1200
+# Default: 100
+# BATCH_SIZE = 100
 
 # Max batch interval (in seconds) before writing to the database
-# Default: 120
-# BATCH_INTERVAL = 120
-
-[DUCKDB.QUACK]
-# Set to true to enable the Quack protocol
-# Default: false
-# ENABLE = false
-
-# Address to listen on for the Quack protocol
-# Default: "localhost:9494"
-# ADDRESS = "localhost:9494"
-
-# To allow remote hosts, set to true:
-# Default: false
-# ALLOW_OTHER_HOSTNAME = false
-
-# Token for authentication.
-# Default: "secret_token"
-# TOKEN = "secret_token"
+# Default: 10
+# BATCH_INTERVAL = 10

@@ -5,96 +5,98 @@
 # LICENSE.txt.txt file in the root directory of this source tree.
 #
 """
-Provides functionality to handle and publish NMEA sentence data into a DuckDB database.
+Provides functionality to handle and publish NMEA sentence data into a SQLite database.
 
 The module organizes NMEA sentence data based on their types and inserts it into
-predefined tables in a DuckDB database in batches. The schema for each table is
+predefined tables in a SQLite database in batches. The schema for each table is
 defined based on supported sentence types. It also supports publishing data from
 an async queue to the database with configurable batch size and interval.
 """
 import asyncio
-import datetime
 import logging
+import sqlite3
 from collections import defaultdict
 from contextlib import asynccontextmanager
 
-import duckdb
-from duckdb import DuckDBPyConnection
-
 from service_utils import RETRYABLE_ERRORS, warn_print_sleep
 
-log = logging.getLogger("nmea-logger.duckdb")
+log = logging.getLogger("nmea-logger.sqlite")
 
 TABLE_SCHEMAS = {
     "DPT": """CREATE TABLE IF NOT EXISTS DPT
               (
-                  timestamp                     TIMESTAMP_MS,
-                  talker                        VARCHAR,
-                  depth_below_transducer_meters DOUBLE,
-                  transducer_depth_meters       DOUBLE,
-                  water_depth_meters            DOUBLE
+                  timestamp                     INTEGER NOT NULL,
+                  talker                        TEXT NOT NULL,
+                  depth_below_transducer_meters REAL,
+                  transducer_depth_meters       REAL,
+                  water_depth_meters            REAL,
+                  PRIMARY KEY (timestamp, talker)
               );""",
     "GLL": """CREATE TABLE IF NOT EXISTS GLL
               (
-                  timestamp TIMESTAMP_MS,
-                  talker    VARCHAR,
-                  latitude  DOUBLE,
-                  longitude DOUBLE
+                  timestamp INTEGER NOT NULL,
+                  talker    TEXT NOT NULL,
+                  latitude  REAL,
+                  longitude REAL,
+                  PRIMARY KEY (timestamp, talker)
               );""",
     "HDT": """CREATE TABLE IF NOT EXISTS HDT
               (
-                  timestamp TIMESTAMP_MS,
-                  talker    VARCHAR,
-                  hdg_true  DOUBLE
+                  timestamp INTEGER NOT NULL,
+                  talker    TEXT NOT NULL,
+                  hdg_true  REAL,
+                  PRIMARY KEY (timestamp, talker)
               );""",
     "MDA": """CREATE TABLE IF NOT EXISTS MDA
               (
-                  timestamp                 TIMESTAMP_MS,
-                  talker                    VARCHAR,
-                  pressure_millibars        DOUBLE,
-                  temperature_air_celsius   DOUBLE,
-                  temperature_water_celsius DOUBLE,
-                  humidity_relative         DOUBLE,
-                  dew_point_celsius         DOUBLE,
-                  twd_true                  DOUBLE,
-                  twd_magnetic              DOUBLE,
-                  tws_knots                 DOUBLE
+                  timestamp                 INTEGER NOT NULL,
+                  talker                    TEXT NOT NULL,
+                  pressure_millibars        REAL,
+                  temperature_air_celsius   REAL,
+                  temperature_water_celsius REAL,
+                  humidity_relative         REAL,
+                  dew_point_celsius         REAL,
+                  twd_true                  REAL,
+                  twd_magnetic              REAL,
+                  tws_knots                 REAL,
+                  PRIMARY KEY (timestamp, talker)
               );""",
     "MWV": """CREATE TABLE IF NOT EXISTS MWV
               (
-                  timestamp TIMESTAMP_MS,
-                  talker    VARCHAR,
-                  awa       DOUBLE,
-                  aws_knots DOUBLE
+                  timestamp INTEGER NOT NULL,
+                  talker    TEXT NOT NULL,
+                  awa       REAL,
+                  aws_knots REAL,
+                  PRIMARY KEY (timestamp, talker)
               );""",
     "ROT": """CREATE TABLE IF NOT EXISTS ROT
               (
-                  timestamp    TIMESTAMP_MS,
-                  talker       VARCHAR,
-                  rate_of_turn DOUBLE
+                  timestamp    INTEGER NOT NULL,
+                  talker       TEXT NOT NULL,
+                  rate_of_turn REAL,
+                  PRIMARY KEY (timestamp, talker)
               );""",
     "RSA": """CREATE TABLE IF NOT EXISTS RSA
               (
-                  timestamp    TIMESTAMP_MS,
-                  talker       VARCHAR,
-                  rudder_angle DOUBLE
+                  timestamp    INTEGER NOT NULL,
+                  talker       TEXT NOT NULL,
+                  rudder_angle REAL,
+                  PRIMARY KEY (timestamp, talker)
               );""",
     "VTG": """CREATE TABLE IF NOT EXISTS VTG
               (
-                  timestamp    TIMESTAMP_MS,
-                  talker       VARCHAR,
-                  cog_true     DOUBLE,
-                  cog_magnetic DOUBLE,
-                  sog_knots    DOUBLE
+                  timestamp    INTEGER NOT NULL,
+                  talker       TEXT NOT NULL,
+                  cog_true     REAL,
+                  cog_magnetic REAL,
+                  sog_knots    REAL,
+                  PRIMARY KEY (timestamp, talker)
               );"""
 }
 
-
-def map_fields(sentence_type: str, talker: str, parsed_nmea:dict[str, float | str | None]):
+def map_fields(sentence_type: str, talker: str, parsed_nmea: dict[str, float | str | None]):
     # TODO: read the ordering from the database schema
-    timestamp_ms = parsed_nmea["timestamp"]
-    timestamp = datetime.datetime.fromtimestamp(timestamp_ms / 1000.0,
-                                                tz=datetime.timezone.utc).replace(tzinfo=None)
+    timestamp = parsed_nmea["timestamp"]
     if sentence_type == "DPT":
         return timestamp, talker, parsed_nmea.get(
             "depth_below_transducer_meters"), parsed_nmea.get(
@@ -121,17 +123,17 @@ def map_fields(sentence_type: str, talker: str, parsed_nmea:dict[str, float | st
     return None
 
 
-def write_batch(conn: DuckDBPyConnection, batch: list[tuple[str, dict]]) -> None:
+def write_batch(conn: sqlite3.Connection, batch: list[tuple[str, dict]]) -> None:
     """
-    Writes a batch of NMEA sentences to a DuckDB database.
+    Writes a batch of NMEA sentences to a SQLite database.
 
     This function processes a list of NMEA sentences and organizes them into
     appropriate database table formats based on their sentence types. The
-    data is then inserted into the corresponding tables in a DuckDB database
+    data is then inserted into the corresponding tables in a SQLite database
     using a single transaction.
 
     Parameters:
-        conn (DuckDBPyConnection): The DuckDB connection object used for database
+        conn (sqlite3.Connection): The SQLite connection object used for database
             operations.
         batch (list[tuple[str, dict]]): A list of tuples where each tuple consists
             of an NMEA address field (str) and its parsed data (dict).
@@ -153,24 +155,22 @@ def write_batch(conn: DuckDBPyConnection, batch: list[tuple[str, dict]]) -> None
     if not grouped:
         return
 
-    conn.execute("BEGIN TRANSACTION")
     try:
-        for table_name, rows in grouped.items():
-            placeholders = ", ".join(["?"] * len(rows[0]))
-            conn.executemany(f"INSERT INTO {table_name} VALUES ({placeholders})", rows)
-        conn.execute("COMMIT")
+        with conn:
+            for table_name, rows in grouped.items():
+                placeholders = ", ".join(["?"] * len(rows[0]))
+                conn.executemany(f"INSERT INTO {table_name} VALUES ({placeholders})", rows)
         log.debug(f"Inserted {len(batch)} rows into database.")
     except Exception as e:
-        conn.execute("ROLLBACK")
-        log.error(f"Error inserting batch into DuckDB: {e}")
+        log.error(f"Error inserting batch into SQLite: {e}")
         raise
 
 
-async def duckdb_publisher_task(db_conn: DuckDBPyConnection,
+async def sqlite_publisher_task(db_conn: sqlite3.Connection,
                                 queue: asyncio.Queue,
                                 config: dict) -> None:
     """
-    Publishes data from an asynchronous queue to a DuckDB database in batches. The batches
+    Publishes data from an asynchronous queue to a SQLite database in batches. The batches
     are configurable in size and interval. The function initializes the database schemas on
     startup.
 
@@ -178,7 +178,7 @@ async def duckdb_publisher_task(db_conn: DuckDBPyConnection,
     the queue.
 
     Args:
-        db_conn: DuckDB database connection.
+        db_conn: SQLite database connection.
         queue: The asyncio queue containing items to be batched and inserted into
             the database. Each item represents a single row to be processed.
         config: Configuration dictionary.
@@ -187,30 +187,9 @@ async def duckdb_publisher_task(db_conn: DuckDBPyConnection,
     for schema_sql in TABLE_SCHEMAS.values():
         await asyncio.to_thread(db_conn.execute, schema_sql)
 
-    quack_config = config.get("DUCKDB", {}).get("QUACK", {})
-    if quack_config.get("ENABLE", False):
-        address = quack_config.get("ADDRESS", "localhost:9494")
-        token = quack_config.get("TOKEN", "secret_token")
-        allow_other_hostname = quack_config.get("ALLOW_OTHER_HOSTNAME", False)
-        try:
-            log.info(f"Starting DuckDB Quack server on {address}")
-            sql_str = f"CALL quack_serve('quack:{address}'"
-            if token:
-                sql_str += f", token='{token}'"
-            if allow_other_hostname:
-                sql_str += ", allow_other_hostname=true"
-            sql_str += ")"
-            res = await asyncio.to_thread(db_conn.execute, sql_str)
-        except Exception as e:
-            log.error(f"Failed to start DuckDB Quack server on {address}: {e}")
-        else:
-            uri, url, token = res.fetchone()
-            log.info(f"DuckDB Quack server started on {address}.")
-            log.debug(f"Quack server URI '{uri}', URL '{url}' and token '{token}'")
-
-    batch_size = config["DUCKDB"].get("BATCH_SIZE", 1200)
-    batch_interval = config["DUCKDB"].get("BATCH_INTERVAL", 120)
-    log.info(f"Using DuckDB batch size {batch_size} and batch interval {batch_interval} seconds.")
+    batch_size = config.get("SQLITE", {}).get("BATCH_SIZE", 100)
+    batch_interval = config.get("SQLITE", {}).get("BATCH_INTERVAL", 10)
+    log.info(f"Using SQLite batch size {batch_size} and batch interval {batch_interval} seconds.")
 
     batch = []
     try:
@@ -239,7 +218,7 @@ async def duckdb_publisher_task(db_conn: DuckDBPyConnection,
                 queue.task_done()
             batch = []
     except asyncio.CancelledError:
-        log.info("DuckDB publisher task cancelled. Draining remaining items from the queue.")
+        log.info("SQLite publisher task cancelled. Draining remaining items from the queue.")
         # Drain the remaining items from the queue
         while not queue.empty():
             try:
@@ -248,18 +227,18 @@ async def duckdb_publisher_task(db_conn: DuckDBPyConnection,
             except asyncio.QueueEmpty:
                 break
         if batch:
-            log.info(f"Draining DuckDB queue: writing final {len(batch)} items.")
+            log.info(f"Draining SQLite queue: writing final {len(batch)} items.")
             await asyncio.to_thread(write_batch, db_conn, batch)
             for _ in range(len(batch)):
                 queue.task_done()
         raise
 
 
-async def duckdb_service(queue: asyncio.Queue, config: dict[str, dict[str, str]]):
+async def sqlite_service(queue: asyncio.Queue, config: dict[str, dict[str, str]]):
     """
-    Runs the DuckDB service to handle asynchronous database operations and tasks.
+    Runs the SQLite service to handle asynchronous database operations and tasks.
 
-    The DuckDB service continuously connects to the specified DuckDB database file 
+    The SQLite service continuously connects to the specified SQLite database file 
     and runs a publisher task to process data using the database. Any retryable 
     errors or unexpected exceptions are logged and handled appropriately. The 
     service operates on an asynchronous loop until explicitly cancelled.
@@ -271,28 +250,28 @@ async def duckdb_service(queue: asyncio.Queue, config: dict[str, dict[str, str]]
 
     Raises:
     asyncio.CancelledError: Raised when the service loop is cancelled.
-    RETTRYABLE_ERRORS: Raised when encountering retryable errors during execution.
+    RETRYABLE_ERRORS: Raised when encountering retryable errors during execution.
     Exception: Raised for unexpected errors that occur during service operation.
     """
-    duckdb_database_path = config['DUCKDB'].get("DATABASE_PATH", "nmea_database.db")
+    sqlite_database_path = config.get('SQLITE', {}).get("DATABASE_PATH", "nmea_database.sdb")
     while True:
         try:
-            async with duckdb_connection(duckdb_database_path) as duckdb_conn:
-                await duckdb_publisher_task(duckdb_conn, queue, config)
+            async with sqlite_connection(sqlite_database_path) as sqlite_conn:
+                await sqlite_publisher_task(sqlite_conn, queue, config)
         except asyncio.CancelledError:
             break
         except RETRYABLE_ERRORS as e:
-            await warn_print_sleep(str(e), config, prefix="DuckDB service")
+            await warn_print_sleep(str(e), config, prefix="SQLite service")
         except Exception as e:
-            log.exception("Unexpected error in DuckDB service")
-            await warn_print_sleep(str(e), config, prefix="DuckDB service")
+            log.exception("Unexpected error in SQLite service")
+            await warn_print_sleep(str(e), config, prefix="SQLite service")
 
 
 @asynccontextmanager
-async def duckdb_connection(database_path):
-    conn = await asyncio.to_thread(duckdb.connect, database_path)
+async def sqlite_connection(database_path):
+    conn = await asyncio.to_thread(sqlite3.connect, database_path, check_same_thread=False)
     try:
         yield conn
     finally:
-        log.info("Closing DuckDB connection.")
+        log.info("Closing SQLite connection.")
         await asyncio.to_thread(conn.close)

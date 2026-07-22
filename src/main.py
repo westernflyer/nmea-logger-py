@@ -40,7 +40,7 @@ import tomllib
 from typing import AsyncGenerator
 
 import mqtt_services
-import duckdb_services
+import sqlite_services
 import parse_nmea
 from service_utils import RETRYABLE_ERRORS, warn_print_sleep
 
@@ -56,7 +56,7 @@ async def main() -> None:
     global config, publish_intervals
 
     parser = argparse.ArgumentParser(
-        description="Read NMEA sentences from multiple sockets, parse, then save to DuckDB and publish to MQTT.")
+        description="Read NMEA sentences from multiple sockets, parse, then save to SQLite and publish to MQTT.")
     parser.add_argument("--config", default="config.toml",
                         help="Path to the TOML configuration file (default: config.toml)")
     args = parser.parse_args()
@@ -96,13 +96,13 @@ async def main() -> None:
     # Shared queues for parsed NMEA sentences. Putting them here makes them
     # persist across failures in any individual service.
     mqtt_queue = asyncio.Queue(maxsize=1000)
-    duckdb_queue = asyncio.Queue(maxsize=1000)
-    subscribers = [mqtt_queue, duckdb_queue]
+    sqlite_queue = asyncio.Queue(maxsize=1000)
+    subscribers = [mqtt_queue, sqlite_queue]
 
     # Start the consuming services
     mqtt_service_task = asyncio.create_task(mqtt_services.mqtt_service(mqtt_queue, config))
-    duckdb_service_task = asyncio.create_task(duckdb_services.duckdb_service(duckdb_queue, config))
-    service_tasks = [mqtt_service_task, duckdb_service_task]
+    sqlite_service_task = asyncio.create_task(sqlite_services.sqlite_service(sqlite_queue, config))
+    service_tasks = [mqtt_service_task, sqlite_service_task]
 
     # Start the NMEA readers
     reader_tasks = []
@@ -134,12 +134,12 @@ async def main() -> None:
         await asyncio.gather(*reader_tasks, return_exceptions=True)
         log.info("NMEA readers stopped.")
 
-        # 2. Drain DuckDB Queue
+        # 2. Drain SQLite Queue
         # Note: This will wait for the current batch to be flushed by the service,
         # which may take up to BATCH_INTERVAL seconds.
-        log.info("Waiting for DuckDB queue to drain...")
-        await duckdb_queue.join()
-        log.info("DuckDB queue drained.")
+        log.info("Waiting for SQLite queue to drain...")
+        await sqlite_queue.join()
+        log.info("SQLite queue drained.")
 
         # 3. Stop Services
         for task in service_tasks:
