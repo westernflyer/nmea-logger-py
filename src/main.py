@@ -7,11 +7,11 @@
 """Read NMEA sentences from multiple sockets, parse, then publish to MQTT and a DuckDB database.
 
 Summary of data flow:
-1. Read: gen_nmea pulls raw bytes from multiple TCP sockets.
-2. Parse: parse_nmea.parse() validates the checksum and converts the raw string into a
+1. Read: gen_nmea pulls raw NMEA 0183 text data from multiple TCP sockets.
+2. Parse: parse_nmea.parse() validates the checksum and converts the strings into a
    Python dictionary.
-3. Queue: Validated data is pushed into two asyncio.Queues, one for DuckDB and one for MQTT.
-4a. Save to DuckDB: duckdb_publisher_task pulls from the queue, then saves to DuckDB.
+3. Queue: Validated data is pushed into two asyncio.Queues, one for SQLite and one for MQTT.
+4a. Save to SQLite: sqlite_publisher_task pulls from the queue, then saves to SQLite.
 4b. Publish to MQTT: mqtt_publisher_task pulls from the queue and checks whether enough time has
     elapsed. If so, it sends the JSON-encoded payload to the MQTT broker using a topic structure
     like nmea/MMSI/SENTENCE_TYPE.

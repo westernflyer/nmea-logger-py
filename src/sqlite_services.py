@@ -156,6 +156,8 @@ def write_batch(conn: sqlite3.Connection, batch: list[tuple[str, dict]]) -> None
         return
 
     try:
+        # Use the connection as a transaction context manager. The inserts inside will be committed
+        # as a single transaction. If there is a failure, they will be rolled back.
         with conn:
             for table_name, rows in grouped.items():
                 placeholders = ", ".join(["?"] * len(rows[0]))
