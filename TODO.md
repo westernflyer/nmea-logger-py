@@ -1,6 +1,6 @@
 Missing sentences (none of them are needed):
 
-| Sentence |  Description                                |
+| Sentence | Description                                 |
 |:---------|:--------------------------------------------|
 | DTM      | Datum, datum offset                         |
 | GNS      | UTC, lat, lon, type of constellation        |

@@ -150,16 +150,16 @@ def dm_to_sd(dm: str | None) -> float | None:
     return float(d) + float(m) / 60
 
 
-def parse_latitude(latitude: str | None, hemisphere: str = 'N') -> float:
+def parse_latitude(latitude: str | None, hemisphere: str = 'N') -> float | None:
     val = dm_to_sd(latitude)
-    if hemisphere == 'S':
+    if val is not None and hemisphere == 'S':
         val = -val
     return val
 
 
-def parse_longitude(longitude: str | None, hemisphere: str = 'E') -> float:
+def parse_longitude(longitude: str | None, hemisphere: str = 'E') -> float | None:
     val = dm_to_sd(longitude)
-    if hemisphere == 'W':
+    if val is not None and hemisphere == 'W':
         val = -val
     return val
 

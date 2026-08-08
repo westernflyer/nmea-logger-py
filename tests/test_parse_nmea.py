@@ -1,6 +1,6 @@
 import pytest
 import parse_nmea
-from parse_nmea import NMEAParsingError, UnknownNMEASentence, NMEAStatusError
+from parse_nmea import NMEAParsingError, UnknownNMEASentence
 
 def test_checksum():
     assert parse_nmea.checksum("GPGLL,4916.45,N,12311.12,W,225444,A") == 0x31
