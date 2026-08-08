@@ -1,0 +1,17 @@
+services:
+  nmea-logger:
+    build: .
+    container_name: nmea-logger
+    volumes:
+      - ./config.toml:/config/config.toml:ro
+      - nmea_data:/data
+    environment:
+      - NMEA_LOGGER_DEBUG=1
+      - SQLITE_DATABASE_PATH=/data/nmea_database.sdb
+    # To reach services on the host or LAN more easily on Linux,
+    # you can use host networking:
+    # network_mode: host
+    restart: unless-stopped
+
+volumes:
+  nmea_data:

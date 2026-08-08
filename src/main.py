@@ -71,6 +71,8 @@ async def main() -> None:
 
     if os.getenv("NMEA_LOGGER_DEBUG") is not None:
         config["DEBUG"] = int(os.getenv("NMEA_LOGGER_DEBUG", 0))
+    if os.getenv("SQLITE_DATABASE_PATH") is not None:
+        config.setdefault("SQLITE", {})["SQLITE_DATABASE_PATH"] = os.getenv("SQLITE_DATABASE_PATH")
 
     # Set up logging depending on the OS
     if sys.platform == "darwin":
@@ -79,9 +81,12 @@ async def main() -> None:
         log_file = "/var/tmp/nmea-logger.log"
         handler = TimedRotatingFileHandler(log_file, when='midnight', backupCount=7)
     else:
-        # For everything else, log to syslog
+        # For everything else, log to syslog if available, else to stdout
         from logging.handlers import SysLogHandler
-        handler = SysLogHandler(address='/dev/log')
+        try:
+            handler = SysLogHandler(address='/dev/log')
+        except Exception:
+            handler = logging.StreamHandler(sys.stdout)
     log.setLevel(logging.DEBUG if config.get("DEBUG") else logging.INFO)
     formatter = logging.Formatter('%(name)s: %(levelname)s %(message)s')
     handler.setFormatter(formatter)

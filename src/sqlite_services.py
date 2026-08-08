@@ -189,8 +189,8 @@ async def sqlite_publisher_task(db_conn: sqlite3.Connection,
     for schema_sql in TABLE_SCHEMAS.values():
         await asyncio.to_thread(db_conn.execute, schema_sql)
 
-    batch_size = config.get("SQLITE", {}).get("BATCH_SIZE", 100)
-    batch_interval = config.get("SQLITE", {}).get("BATCH_INTERVAL", 10)
+    batch_size = config.get("SQLITE", {}).get("SQLITE_BATCH_SIZE", 100)
+    batch_interval = config.get("SQLITE", {}).get("SQLITE_BATCH_INTERVAL", 10)
     log.info(f"Using SQLite batch size {batch_size} and batch interval {batch_interval} seconds.")
 
     batch = []

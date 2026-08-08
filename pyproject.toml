@@ -4,11 +4,11 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "nmea-logger-py"
-version = "1.7.1"
+version = "1.8.0"
 authors = [
   { name="Tom Keffer", email="tkeffer@gmail.com" },
 ]
-description = "Read NMEA 0183 sentences from one or more sockets, parse them, then publish to DuckDB and MQTT"
+description = "Read NMEA 0183 sentences from one or more sockets, parse them, then publish to SQLite and MQTT"
 readme = "README.md"
 license = { text="MIT" }
 requires-python = ">=3.12"
@@ -40,6 +40,7 @@ nmea-logger = "main:run"
 
 [tool.setuptools]
 package-dir = {"" = "src"}
+py-modules = ["main", "mqtt_services", "service_utils", "sqlite_services"]
 
 [tool.setuptools.packages.find]
 where = ["src"]

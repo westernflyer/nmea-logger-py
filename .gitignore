@@ -11,3 +11,5 @@ sample_data
 *.pyc
 __pycache__
 .venv
+
+build/

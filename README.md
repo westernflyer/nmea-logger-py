@@ -139,7 +139,56 @@ but make sure you use it consistently in what follows.
    sudo systemctl start nmea-logger
    sudo systemctl enable nmea-logger
    ```
-   
+
+## Running with Docker
+
+You can also run `nmea-logger` using Docker. This is the recommended way to run the application if you want to isolate it from your host system.
+
+### Using Docker Compose (Recommended)
+
+1. Create a `config.toml` by copying the sample:
+   ```bash
+   cp config_sample.toml config.toml
+   ```
+2. Edit `config.toml` to match your environment. If you are running an MQTT broker in another container, use its service name or IP address.
+3. Start the container:
+   ```bash
+   docker compose up -d
+   ```
+
+### Using Docker CLI
+
+1. Build the image:
+   ```bash
+   docker build -t nmea-logger .
+   ```
+2. Run the container:
+   ```bash
+   docker run -d \
+     --name nmea-logger \
+     -v $(pwd)/config.toml:/config/config.toml:ro \
+     -v nmea_data:/data \
+     -e NMEA_LOGGER_DEBUG=1 \
+     nmea-logger
+   ```
+
+### Docker Networking
+
+When running in a Docker container, there are a few networking considerations:
+
+- **Reaching LAN IPs**: The container can typically reach external LAN IPs (like `192.168.2.226`) without extra configuration.
+- **The `localhost` Pitfall**: If your MQTT broker is running on the host machine (not in a container), setting `MQTT_BROKER = "localhost"` in `config.toml` will **not** work, as `localhost` inside the container refers to the container itself.
+    - On Linux, you can use the host's LAN IP address or use `network_mode: host` in `docker-compose.yml`.
+    - On macOS or Windows, you can use `host.docker.internal`.
+- **Host Networking (Linux only)**: For the best performance and to avoid any routing issues when accessing NMEA devices on your local network, you can use host networking. In your `docker-compose.yml`, add `network_mode: host` to the service definition. Note that when using host networking, port mappings and custom networks are ignored.
+
+## Configuration via Environment Variables
+
+The following environment variables can be used to override settings in `config.toml`:
+
+- `NMEA_LOGGER_DEBUG`: Set to `1` for debug logging, `0` for info.
+- `SQLITE_DATABASE_PATH`: Path to the SQLite database file inside the container (default: `/data/nmea_database.sdb`).
+
 ## Copyright
 
 Copyright (c) 2025-present Tom Keffer <tkeffer@gmail.com>

@@ -26,6 +26,8 @@ The project uses `asyncio` for concurrent operations. The main loop (`src/main.p
 - `src/sqlite_services.py`: SQLite storage implementation.
 - `src/service_utils.py`: Shared utilities for services (e.g., error handling).
 - `config.toml`: User configuration (use `config_sample.toml` as a template).
+- `Dockerfile`: Container definition.
+- `docker-compose.yml`: Example Compose configuration.
 - `simulator/`: A tool for generating synthetic NMEA data for testing.
 
 ## Common Development Tasks
@@ -55,7 +57,14 @@ The following are common fields for all tables:
 ### Troubleshooting Services
 
 -   The application uses `SysLogHandler` on Linux and `TimedRotatingFileHandler` on macOS.
+-   In Docker containers or environments without syslog, it falls back to `logging.StreamHandler` (console logging).
 -   Check logs for "self-healing" messages if services restart due to errors.
+
+### Docker Networking
+
+-   Containers can reach external LAN IPs (like NMEA gateways) by default.
+-   `localhost` in `config.toml` refers to the container itself. To reach a broker on the host, use the host's LAN IP or `host.docker.internal`.
+-   On Linux, using `network_mode: host` in `docker-compose.yml` is often the simplest way to ensure full access to LAN resources and the host's services.
 
 ## Testing
 

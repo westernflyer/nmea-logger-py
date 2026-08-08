@@ -56,12 +56,12 @@ FTMWV = 10000    # Relative wind speed and angle - FT602
 
 # Path to the SQLite database (env: SQLITE_DATABASE_PATH)
 # Default: "nmea_database.sdb"
-# DATABASE_PATH = "nmea_database.sdb"
+# SQLITE_DATABASE_PATH = "nmea_database.sdb"
 
 # Batch sizes for writes to the database
 # Default: 100
-# BATCH_SIZE = 100
+# SQLITE_BATCH_SIZE = 100
 
 # Max batch interval (in seconds) before writing to the database
 # Default: 10
-# BATCH_INTERVAL = 10
+# SQLITE_BATCH_INTERVAL = 10
