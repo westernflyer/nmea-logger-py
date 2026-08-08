@@ -255,7 +255,7 @@ async def sqlite_service(queue: asyncio.Queue, config: dict[str, dict[str, str]]
     RETRYABLE_ERRORS: Raised when encountering retryable errors during execution.
     Exception: Raised for unexpected errors that occur during service operation.
     """
-    sqlite_database_path = config.get('SQLITE', {}).get("DATABASE_PATH", "nmea_database.sdb")
+    sqlite_database_path = config.get('SQLITE', {}).get("SQLITE_DATABASE_PATH", "nmea_database.sdb")
     while True:
         try:
             async with sqlite_connection(sqlite_database_path) as sqlite_conn:

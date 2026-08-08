@@ -141,7 +141,7 @@ async def main() -> None:
 
         # 2. Drain SQLite Queue
         # Note: This will wait for the current batch to be flushed by the service,
-        # which may take up to BATCH_INTERVAL seconds.
+        # which may take up to SQLITE_BATCH_INTERVAL seconds.
         log.info("Waiting for SQLite queue to drain...")
         await sqlite_queue.join()
         log.info("SQLite queue drained.")

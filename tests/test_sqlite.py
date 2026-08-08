@@ -12,9 +12,9 @@ async def test_schema_creation(tmp_path):
     main.config = {
         "MMSI": "368323170",
         "SQLITE": {
-            "DATABASE_PATH": db_path,
-            "BATCH_SIZE": 1,
-            "BATCH_INTERVAL": 10
+            "SQLITE_DATABASE_PATH": db_path,
+            "SQLITE_BATCH_SIZE": 1,
+            "SQLITE_BATCH_INTERVAL": 10
         }
     }
 
@@ -59,9 +59,9 @@ async def test_size_based_flushing(tmp_path):
     main.config = {
         "MMSI": "368323170",
         "SQLITE": {
-            "DATABASE_PATH": db_path,
-            "BATCH_SIZE": 3,
-            "BATCH_INTERVAL": 10
+            "SQLITE_DATABASE_PATH": db_path,
+            "SQLITE_BATCH_SIZE": 3,
+            "SQLITE_BATCH_INTERVAL": 10
         }
     }
 
@@ -108,9 +108,9 @@ async def test_interval_based_flushing(tmp_path):
     main.config = {
         "MMSI": "368323170",
         "SQLITE": {
-            "DATABASE_PATH": db_path,
-            "BATCH_SIZE": 10,
-            "BATCH_INTERVAL": 0.5
+            "SQLITE_DATABASE_PATH": db_path,
+            "SQLITE_BATCH_SIZE": 10,
+            "SQLITE_BATCH_INTERVAL": 0.5
         }
     }
 
@@ -152,9 +152,9 @@ async def test_sentence_field_mapping(tmp_path):
     main.config = {
         "MMSI": "368323170",
         "SQLITE": {
-            "DATABASE_PATH": db_path,
-            "BATCH_SIZE": 1,
-            "BATCH_INTERVAL": 10
+            "SQLITE_DATABASE_PATH": db_path,
+            "SQLITE_BATCH_SIZE": 1,
+            "SQLITE_BATCH_INTERVAL": 10
         }
     }
 
@@ -242,9 +242,9 @@ async def test_sqlite_drain_on_cancel(tmp_path):
     db_path = str(tmp_path / "test_drain.db")
     config = {
         "SQLITE": {
-            "DATABASE_PATH": db_path,
-            "BATCH_SIZE": 100,
-            "BATCH_INTERVAL": 100
+            "SQLITE_DATABASE_PATH": db_path,
+            "SQLITE_BATCH_SIZE": 100,
+            "SQLITE_BATCH_INTERVAL": 100
         }
     }
     queue = asyncio.Queue()

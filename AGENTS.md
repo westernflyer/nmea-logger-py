@@ -66,6 +66,12 @@ The following are common fields for all tables:
 -   `localhost` in `config.toml` refers to the container itself. To reach a broker on the host, use the host's LAN IP or `host.docker.internal`.
 -   On Linux, using `network_mode: host` in `docker-compose.yml` is often the simplest way to ensure full access to LAN resources and the host's services.
 
+### Data Persistence and Access
+
+-   The SQLite database is stored in `/data/nmea_database.sdb` inside the container.
+-   Use bind mounts (e.g., `./data:/data` in `docker-compose.yml`) to make the database file easily accessible on the host.
+-   Users can also use `docker cp` to extract the database file from a running container.
+
 ## Testing
 
 Testing is done using `pytest`.

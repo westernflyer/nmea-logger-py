@@ -2,7 +2,7 @@
 Added Docker support and comprehensive documentation for containerized deployment.
 Improved environment-aware configuration and logging for better container compatibility.
 Added Docker networking guide for reaching LAN NMEA devices.
-Fixed `ModuleNotFoundError` when running in Docker by including top-level modules in the package.
+Fixed `ModuleNotFoundError` when running in Docker.
 
 # 1.7.1
 Fixed potential errors in `VLW` and `RMC` parsers.
