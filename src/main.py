@@ -82,14 +82,15 @@ async def main() -> None:
         handler = TimedRotatingFileHandler(log_file, when='midnight', backupCount=7)
     else:
         # For everything else, log to syslog if available, else to stdout
-        from logging.handlers import SysLogHandler
-        try:
+        if os.path.exists("/dev/log"):
+            from logging.handlers import SysLogHandler
             handler = SysLogHandler(address='/dev/log')
-        except Exception:
+        else:
             handler = logging.StreamHandler(sys.stdout)
     log.setLevel(logging.DEBUG if config.get("DEBUG") else logging.INFO)
     formatter = logging.Formatter('%(name)s: %(levelname)s %(message)s')
     handler.setFormatter(formatter)
+    log.handlers.clear()
     log.addHandler(handler)
 
     log.info("Starting up nmea-logger.  ")

@@ -1,3 +1,6 @@
+# 1.8.1
+Avoid errors when attempting to write to `/dev/log` when using Docker.
+
 # 1.8.0
 Added Docker support and comprehensive documentation for containerized deployment.
 Improved environment-aware configuration and logging for better container compatibility.
