@@ -2,9 +2,12 @@ services:
   nmea-logger:
     build: .
     container_name: nmea-logger
+    # To run as a non-root user, uncomment, then plug in the user and group number of the user.
+    # Otherwise, the resultant database file will be owned by root.
+    # user: 1002:1002
     volumes:
       - ./config.toml:/config/config.toml:ro
-      - ./data:/data
+      - /var/tmp/nmea-data:/data
     environment:
       - NMEA_LOGGER_DEBUG=1
       - SQLITE_DATABASE_PATH=/data/nmea_database.sdb
