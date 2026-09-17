@@ -1,3 +1,6 @@
+# 2.0.0
+Switch to SQLite
+
 # 1.8.1
 Avoid errors when attempting to write to `/dev/log` when using Docker.
 
